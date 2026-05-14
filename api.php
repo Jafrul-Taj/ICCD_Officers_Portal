@@ -144,7 +144,7 @@ function getEmployees() {
     if ($eid      !== '') { $where[] = 'eid LIKE ?';       $params[] = '%' . $eid . '%';   $types .= 's'; }
     if (!$show_inactive)  { $where[] = "status = 'active'"; }
 
-    $sql = 'SELECT id, eid, name, designation, division, sub_division, role, email, cell_number, status
+    $sql = 'SELECT id, eid, name, designation, division, sub_division, role, email, cell_number, extension_no, status
             FROM employees';
     if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
     $sql .= ' ORDER BY name ASC';
@@ -302,7 +302,7 @@ function getEmployee() {
     }
     $conn = getConnection();
     $stmt = $conn->prepare(
-        "SELECT id, eid, name, designation, division, sub_division, role, email, cell_number, status
+        "SELECT id, eid, name, designation, division, sub_division, role, email, cell_number, extension_no, status
          FROM employees WHERE id = ?"
     );
     $stmt->bind_param('i', $id);
@@ -343,17 +343,24 @@ function validateEmployeeInput(
 // ─────────────────────────────────────────────
 
 function addEmployee() {
-    $eid      = trim($_POST['eid']          ?? '');
-    $name     = trim($_POST['name']         ?? '');
-    $desig    = trim($_POST['designation']  ?? '');
-    $division = trim($_POST['division']     ?? '');
-    $sub_div  = trim($_POST['sub_division'] ?? '');
-    $role     = trim($_POST['role']         ?? '');
-    $email    = trim($_POST['email']        ?? '');
-    $cell     = trim($_POST['cell_number']  ?? '');
+    $eid      = trim($_POST['eid']           ?? '');
+    $name     = trim($_POST['name']          ?? '');
+    $desig    = trim($_POST['designation']   ?? '');
+    $division = trim($_POST['division']      ?? '');
+    $sub_div  = trim($_POST['sub_division']  ?? '');
+    $role     = trim($_POST['role']          ?? '');
+    $email    = trim($_POST['email']         ?? '');
+    $cell     = trim($_POST['cell_number']   ?? '');
+    $ext      = trim($_POST['extension_no']  ?? '');
 
     $err = validateEmployeeInput($eid, $name, $desig, $division, $sub_div, $role, $email, $cell);
     if ($err) { echo json_encode(['success' => false, 'message' => $err]); return; }
+
+    if ($ext !== '' && !preg_match('/^\d{1,10}$/', $ext)) {
+        echo json_encode(['success' => false, 'message' => 'Extension number must be digits only (max 10).']);
+        return;
+    }
+    $extVal = ($ext !== '') ? $ext : null;
 
     $conn = getConnection();
 
@@ -368,10 +375,10 @@ function addEmployee() {
     $stmt->close();
 
     $stmt = $conn->prepare(
-        "INSERT INTO employees (eid, name, designation, division, sub_division, role, email, cell_number)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO employees (eid, name, designation, division, sub_division, role, email, cell_number, extension_no)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
-    $stmt->bind_param('ssssssss', $eid, $name, $desig, $division, $sub_div, $role, $email, $cell);
+    $stmt->bind_param('sssssssss', $eid, $name, $desig, $division, $sub_div, $role, $email, $cell, $extVal);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => 'Employee added successfully.']);
@@ -392,6 +399,7 @@ function editEmployee() {
     $role     = trim($_POST['role']          ?? '');
     $email    = trim($_POST['email']         ?? '');
     $cell     = trim($_POST['cell_number']   ?? '');
+    $ext      = trim($_POST['extension_no']  ?? '');
 
     if ($id <= 0) {
         echo json_encode(['success' => false, 'message' => 'Invalid employee ID.']);
@@ -400,6 +408,12 @@ function editEmployee() {
 
     $err = validateEmployeeInput($eid, $name, $desig, $division, $sub_div, $role, $email, $cell);
     if ($err) { echo json_encode(['success' => false, 'message' => $err]); return; }
+
+    if ($ext !== '' && !preg_match('/^\d{1,10}$/', $ext)) {
+        echo json_encode(['success' => false, 'message' => 'Extension number must be digits only (max 10).']);
+        return;
+    }
+    $extVal = ($ext !== '') ? $ext : null;
 
     $conn = getConnection();
 
@@ -415,10 +429,10 @@ function editEmployee() {
 
     $stmt = $conn->prepare(
         "UPDATE employees
-         SET eid=?, name=?, designation=?, division=?, sub_division=?, role=?, email=?, cell_number=?
+         SET eid=?, name=?, designation=?, division=?, sub_division=?, role=?, email=?, cell_number=?, extension_no=?
          WHERE id=?"
     );
-    $stmt->bind_param('ssssssssi', $eid, $name, $desig, $division, $sub_div, $role, $email, $cell, $id);
+    $stmt->bind_param('sssssssssi', $eid, $name, $desig, $division, $sub_div, $role, $email, $cell, $extVal, $id);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => 'Employee updated successfully.']);

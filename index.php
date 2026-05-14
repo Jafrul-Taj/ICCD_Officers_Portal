@@ -2,7 +2,7 @@
 session_start();
 $isOperator      = !empty($_SESSION['operator_id']);
 $operatorUsername = htmlspecialchars($_SESSION['operator_username'] ?? '', ENT_QUOTES);
-$opCols           = $isOperator ? 11 : 10;
+$opCols           = $isOperator ? 12 : 11;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -335,7 +335,7 @@ $opCols           = $isOperator ? 11 : 10;
         <div class="header-brand">
             <div class="brand-icon"><i class="bi bi-people-fill"></i></div>
             <div>
-                <p class="brand-title">ICCD Officer's Portal</p>
+                <p class="brand-title">Employee Archive</p>
             </div>
         </div>
         <div class="header-right">
@@ -442,6 +442,7 @@ $opCols           = $isOperator ? 11 : 10;
                         <th>Role</th>
                         <th>Email</th>
                         <th>Cell Number</th>
+                        <th>Ext. No</th>
                         <th>Status</th>
                         <?php if ($isOperator): ?><th>Actions</th><?php endif; ?>
                     </tr>
@@ -590,6 +591,18 @@ $opCols           = $isOperator ? 11 : 10;
                             <div class="invalid-feedback"></div>
                         </div>
 
+                        <!-- Row 5: Ext. No (optional) -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Ext. No
+                                <span class="text-muted fw-normal" style="font-size:.78rem;">(optional)</span>
+                            </label>
+                            <input type="text" class="form-control" id="fExt"
+                                   placeholder="e.g. 7301" maxlength="10"
+                                   inputmode="numeric" pattern="\d*">
+                            <div class="invalid-feedback"></div>
+                        </div>
+
                     </div><!-- /row -->
                     <div id="empFormErr" class="alert alert-danger py-2 mt-3"
                          style="display:none;font-size:.83rem;"></div>
@@ -724,7 +737,7 @@ $(function () {
     });
 
     /* ── Real-time per-field validation ── */
-    $('#fEid, #fName, #fEmail, #fCell').on('input', function () { clearFieldError(this); });
+    $('#fEid, #fName, #fEmail, #fCell, #fExt').on('input', function () { clearFieldError(this); });
     $('#fDesig, #fDiv, #fSubDiv, #fRole').on('change', function () { clearFieldError(this); });
 });
 
@@ -953,6 +966,7 @@ function renderTable(employees) {
         ));
         $tr.append($('<td>').text(emp.email || ''));
         $tr.append($('<td>').text(emp.cell_number || ''));
+        $tr.append($('<td>').text(emp.extension_no || ''));
 
         const pillClass = inactive ? 'pill-inactive' : 'pill-active';
         const pillIcon  = inactive ? 'bi-x-circle-fill' : 'bi-check-circle-fill';
@@ -1027,6 +1041,7 @@ function openEditModal(id) {
             $('#fName').val(e.name  || '');
             $('#fEmail').val(e.email || '');
             $('#fCell').val(e.cell_number || '');
+            $('#fExt').val(e.extension_no || '');
 
             setSelectValue('#fDesig', e.designation);
 
@@ -1066,6 +1081,7 @@ function saveEmployee() {
     const role  = $('#fRole').val();
     const email = $('#fEmail').val().trim();
     const cell  = $('#fCell').val().trim();
+    const ext   = $('#fExt').val().trim();
 
     let valid = true;
     const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1088,6 +1104,9 @@ function saveEmployee() {
     } else if (!/^\d{10,15}$/.test(cell)) {
         setFieldError('#fCell', 'Must be 10–15 digits, numbers only.');     valid = false;
     }
+    if (ext && !/^\d{1,10}$/.test(ext)) {
+        setFieldError('#fExt', 'Digits only, max 10 characters.');          valid = false;
+    }
 
     if (!valid) return;
 
@@ -1101,7 +1120,8 @@ function saveEmployee() {
         sub_division: sub,
         role,
         email,
-        cell_number:  cell
+        cell_number:  cell,
+        extension_no: ext
     };
 
     showSpinner();
