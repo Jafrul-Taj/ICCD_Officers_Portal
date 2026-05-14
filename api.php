@@ -7,13 +7,14 @@ require_once 'config.php';
 $action = $_REQUEST['action'] ?? '';
 
 switch ($action) {
-    case 'login':           handleLogin();      break;
-    case 'logout':          handleLogout();     break;
-    case 'check_session':   checkSession();     break;
-    case 'get_employees':   getEmployees();     break;
-    case 'get_filter_data': getFilterData();    break;
-    case 'get_subdivisions': getSubdivisions(); break;
-    case 'get_employee':    getEmployee();      break;
+    case 'login':            handleLogin();       break;
+    case 'logout':           handleLogout();      break;
+    case 'check_session':    checkSession();      break;
+    case 'get_employees':    getEmployees();      break;
+    case 'get_filter_data':  getFilterData();     break;
+    case 'get_subdivisions': getSubdivisions();   break;
+    case 'get_roles':        getRoles();          break;
+    case 'get_employee':     getEmployee();       break;
     case 'add_employee':
         requireOperator();
         addEmployee();
@@ -48,9 +49,9 @@ function requireOperator() {
 
 function checkSession() {
     echo json_encode([
-        'success'    => true,
-        'logged_in'  => !empty($_SESSION['operator_id']),
-        'username'   => $_SESSION['operator_username'] ?? null
+        'success'   => true,
+        'logged_in' => !empty($_SESSION['operator_id']),
+        'username'  => $_SESSION['operator_username'] ?? null
     ]);
 }
 
@@ -93,17 +94,41 @@ function handleLogout() {
 }
 
 // ─────────────────────────────────────────────
+//  DESIGNATION ORDER (shared constant)
+// ─────────────────────────────────────────────
+
+function designationOrder(): array {
+    return [
+        'EVP'    => 1,  'SVP'  => 2,  'FVP'   => 3,  'VP'    => 4,
+        'FAVP'   => 5,  'AVP'  => 6,  'SEO'   => 7,  'EO'    => 8,
+        'SO'     => 9,  'Off'  => 10, 'JO'    => 11, 'DEO'   => 12,
+        'SO(CS)' => 13, 'EQ'   => 14,
+    ];
+}
+
+function roleOrder(): array {
+    return [
+        'Head of ICC & Audit' => 1,
+        'Audit Head'          => 2,
+        'Compliance Head'     => 3,
+        'Functional Head'     => 4,
+        'Team Lead'           => 5,
+        'Team Member'         => 6,
+    ];
+}
+
+// ─────────────────────────────────────────────
 //  EMPLOYEES – READ
 // ─────────────────────────────────────────────
 
 function getEmployees() {
     $division      = trim($_GET['division']     ?? '');
     $sub_div       = trim($_GET['sub_division'] ?? '');
+    $role          = trim($_GET['role']         ?? '');
     $name          = trim($_GET['name']         ?? '');
     $eid           = trim($_GET['eid']          ?? '');
     $show_inactive = (($_GET['show_inactive'] ?? '0') === '1');
 
-    // Only operators can see inactive employees
     if (empty($_SESSION['operator_id'])) {
         $show_inactive = false;
     }
@@ -112,13 +137,15 @@ function getEmployees() {
     $params = [];
     $types  = '';
 
-    if ($division !== '') { $where[] = 'division = ?';     $params[] = $division;       $types .= 's'; }
-    if ($sub_div  !== '') { $where[] = 'sub_division = ?'; $params[] = $sub_div;        $types .= 's'; }
-    if ($name     !== '') { $where[] = 'name LIKE ?';      $params[] = '%' . $name . '%'; $types .= 's'; }
-    if ($eid      !== '') { $where[] = 'eid LIKE ?';       $params[] = '%' . $eid . '%';  $types .= 's'; }
+    if ($division !== '') { $where[] = 'division = ?';     $params[] = $division;          $types .= 's'; }
+    if ($sub_div  !== '') { $where[] = 'sub_division = ?'; $params[] = $sub_div;           $types .= 's'; }
+    if ($role     !== '') { $where[] = 'role = ?';         $params[] = $role;              $types .= 's'; }
+    if ($name     !== '') { $where[] = 'name LIKE ?';      $params[] = '%' . $name . '%';  $types .= 's'; }
+    if ($eid      !== '') { $where[] = 'eid LIKE ?';       $params[] = '%' . $eid . '%';   $types .= 's'; }
     if (!$show_inactive)  { $where[] = "status = 'active'"; }
 
-    $sql = 'SELECT id, eid, name, designation, division, sub_division, email, cell_number, status FROM employees';
+    $sql = 'SELECT id, eid, name, designation, division, sub_division, role, email, cell_number, status
+            FROM employees';
     if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
     $sql .= ' ORDER BY name ASC';
 
@@ -130,31 +157,11 @@ function getEmployees() {
     $stmt->close();
     $conn->close();
 
-    // Define designation hierarchy
-    $designationOrder = [
-        'EVP' => 1,
-        'SVP' => 2,
-        'FVP' => 3,
-        'VP' => 4,
-        'FAVP' => 5,
-        'AVP' => 6,
-        'SEO' => 7,
-        'EO' => 8,
-        'SO' => 9,
-        'Off' => 10,
-        'JO' => 11,
-        'DEO' => 12,
-        'SO(CS)' => 13
-    ];
-
-    // Sort by designation hierarchy, then by name
-    usort($rows, function ($a, $b) use ($designationOrder) {
-        $orderA = $designationOrder[$a['designation']] ?? 999;
-        $orderB = $designationOrder[$b['designation']] ?? 999;
-        
-        if ($orderA !== $orderB) {
-            return $orderA - $orderB;
-        }
+    $order = designationOrder();
+    usort($rows, function ($a, $b) use ($order) {
+        $oa = $order[$a['designation']] ?? 999;
+        $ob = $order[$b['designation']] ?? 999;
+        if ($oa !== $ob) return $oa - $ob;
         return strcmp($a['name'], $b['name']);
     });
 
@@ -162,13 +169,14 @@ function getEmployees() {
 }
 
 function getFilterData() {
-    $conn   = getConnection();
+    $conn = getConnection();
+
+    // Divisions + sub_divisions map
     $result = $conn->query(
         "SELECT DISTINCT division, sub_division FROM employees
          WHERE division IS NOT NULL AND division <> ''
          ORDER BY division, sub_division"
     );
-
     $divisions       = [];
     $subdivisionsMap = [];
     $allSubs         = [];
@@ -176,57 +184,114 @@ function getFilterData() {
     while ($row = $result->fetch_assoc()) {
         $div = $row['division'];
         $sub = $row['sub_division'];
-
         if (!in_array($div, $divisions, true)) $divisions[] = $div;
-
         if ($sub !== null && $sub !== '') {
             if (!isset($subdivisionsMap[$div])) $subdivisionsMap[$div] = [];
             if (!in_array($sub, $subdivisionsMap[$div], true)) $subdivisionsMap[$div][] = $sub;
             if (!in_array($sub, $allSubs, true))               $allSubs[] = $sub;
         }
     }
-
     sort($divisions);
     sort($allSubs);
     foreach ($subdivisionsMap as &$arr) sort($arr);
     unset($arr);
+
+    // Designations (sorted by hierarchy)
+    $result = $conn->query(
+        "SELECT DISTINCT designation FROM employees
+         WHERE designation IS NOT NULL AND designation <> ''
+         ORDER BY designation"
+    );
+    $designations = [];
+    while ($row = $result->fetch_assoc()) $designations[] = $row['designation'];
+    $dOrder = designationOrder();
+    usort($designations, function ($a, $b) use ($dOrder) {
+        $oa = $dOrder[$a] ?? 999;
+        $ob = $dOrder[$b] ?? 999;
+        if ($oa !== $ob) return $oa - $ob;
+        return strcmp($a, $b);
+    });
+
+    // Roles (sorted by hierarchy)
+    $result = $conn->query(
+        "SELECT DISTINCT role FROM employees
+         WHERE role IS NOT NULL AND role <> ''
+         ORDER BY role"
+    );
+    $roles  = [];
+    while ($row = $result->fetch_assoc()) $roles[] = $row['role'];
+    $rOrder = roleOrder();
+    usort($roles, function ($a, $b) use ($rOrder) {
+        $oa = $rOrder[$a] ?? 999;
+        $ob = $rOrder[$b] ?? 999;
+        if ($oa !== $ob) return $oa - $ob;
+        return strcmp($a, $b);
+    });
 
     $conn->close();
     echo json_encode([
         'success'          => true,
         'divisions'        => $divisions,
         'subdivisions'     => $subdivisionsMap,
-        'all_subdivisions' => $allSubs
+        'all_subdivisions' => $allSubs,
+        'designations'     => $designations,
+        'roles'            => $roles,
     ]);
 }
 
 function getSubdivisions() {
     $division = trim($_GET['division'] ?? '');
-    
     if ($division === '') {
         echo json_encode(['success' => false, 'message' => 'Division is required.']);
         return;
     }
-    
     $conn = getConnection();
     $stmt = $conn->prepare(
-        "SELECT DISTINCT sub_division FROM employees 
+        "SELECT DISTINCT sub_division FROM employees
          WHERE division = ? AND sub_division IS NOT NULL AND sub_division != ''
          ORDER BY sub_division ASC"
     );
     $stmt->bind_param('s', $division);
     $stmt->execute();
-    $result = $stmt->get_result();
+    $result       = $stmt->get_result();
     $subdivisions = [];
-    
-    while ($row = $result->fetch_assoc()) {
-        $subdivisions[] = $row['sub_division'];
-    }
-    
+    while ($row = $result->fetch_assoc()) $subdivisions[] = $row['sub_division'];
     $stmt->close();
     $conn->close();
-    
     echo json_encode(['success' => true, 'subdivisions' => $subdivisions]);
+}
+
+function getRoles() {
+    $division = trim($_GET['division']     ?? '');
+    $sub_div  = trim($_GET['sub_division'] ?? '');
+
+    $where  = ["role IS NOT NULL", "role <> ''"];
+    $params = [];
+    $types  = '';
+
+    if ($division !== '') { $where[] = 'division = ?';     $params[] = $division; $types .= 's'; }
+    if ($sub_div  !== '') { $where[] = 'sub_division = ?'; $params[] = $sub_div;  $types .= 's'; }
+
+    $sql  = 'SELECT DISTINCT role FROM employees WHERE ' . implode(' AND ', $where);
+
+    $conn = getConnection();
+    $stmt = $conn->prepare($sql);
+    if ($params) { $stmt->bind_param($types, ...$params); }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $roles  = [];
+    while ($row = $result->fetch_assoc()) $roles[] = $row['role'];
+    $stmt->close();
+    $conn->close();
+
+    $rOrder = roleOrder();
+    usort($roles, function ($a, $b) use ($rOrder) {
+        $oa = $rOrder[$a] ?? 999;
+        $ob = $rOrder[$b] ?? 999;
+        if ($oa !== $ob) return $oa - $ob;
+        return strcmp($a, $b);
+    });
+    echo json_encode(['success' => true, 'roles' => $roles]);
 }
 
 function getEmployee() {
@@ -235,10 +300,9 @@ function getEmployee() {
         echo json_encode(['success' => false, 'message' => 'Invalid ID.']);
         return;
     }
-
     $conn = getConnection();
     $stmt = $conn->prepare(
-        "SELECT id, eid, name, designation, division, sub_division, email, cell_number, status
+        "SELECT id, eid, name, designation, division, sub_division, role, email, cell_number, status
          FROM employees WHERE id = ?"
     );
     $stmt->bind_param('i', $id);
@@ -255,6 +319,26 @@ function getEmployee() {
 }
 
 // ─────────────────────────────────────────────
+//  SHARED VALIDATION
+// ─────────────────────────────────────────────
+
+function validateEmployeeInput(
+    string $eid, string $name, string $desig, string $division,
+    string $sub_div, string $role, string $email, string $cell
+): ?string {
+    if ($eid      === '') return 'EID is required.';
+    if ($name     === '') return 'Full Name is required.';
+    if ($desig    === '') return 'Designation is required.';
+    if ($division === '') return 'Division is required.';
+    if ($role     === '') return 'Role is required.';
+    if ($email    === '') return 'Email is required.';
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return 'Invalid email address format (e.g. name@domain.com).';
+    if ($cell     === '') return 'Cell Number is required.';
+    if (!preg_match('/^\d{10,15}$/', $cell)) return 'Cell Number must be 10–15 digits (numbers only).';
+    return null;
+}
+
+// ─────────────────────────────────────────────
 //  EMPLOYEES – WRITE (operator only)
 // ─────────────────────────────────────────────
 
@@ -264,13 +348,12 @@ function addEmployee() {
     $desig    = trim($_POST['designation']  ?? '');
     $division = trim($_POST['division']     ?? '');
     $sub_div  = trim($_POST['sub_division'] ?? '');
+    $role     = trim($_POST['role']         ?? '');
     $email    = trim($_POST['email']        ?? '');
     $cell     = trim($_POST['cell_number']  ?? '');
 
-    if ($eid === '' || $name === '') {
-        echo json_encode(['success' => false, 'message' => 'EID and Name are required.']);
-        return;
-    }
+    $err = validateEmployeeInput($eid, $name, $desig, $division, $sub_div, $role, $email, $cell);
+    if ($err) { echo json_encode(['success' => false, 'message' => $err]); return; }
 
     $conn = getConnection();
 
@@ -285,34 +368,38 @@ function addEmployee() {
     $stmt->close();
 
     $stmt = $conn->prepare(
-        "INSERT INTO employees (eid, name, designation, division, sub_division, email, cell_number)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO employees (eid, name, designation, division, sub_division, role, email, cell_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
-    $stmt->bind_param('sssssss', $eid, $name, $desig, $division, $sub_div, $email, $cell);
+    $stmt->bind_param('ssssssss', $eid, $name, $desig, $division, $sub_div, $role, $email, $cell);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => 'Employee added successfully.']);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to add employee.']);
+        echo json_encode(['success' => false, 'message' => 'Failed to add employee. Please try again.']);
     }
     $stmt->close();
     $conn->close();
 }
 
 function editEmployee() {
-    $id       = intval(trim($_POST['id']           ?? 0));
-    $eid      = trim($_POST['eid']          ?? '');
-    $name     = trim($_POST['name']         ?? '');
-    $desig    = trim($_POST['designation']  ?? '');
-    $division = trim($_POST['division']     ?? '');
-    $sub_div  = trim($_POST['sub_division'] ?? '');
-    $email    = trim($_POST['email']        ?? '');
-    $cell     = trim($_POST['cell_number']  ?? '');
+    $id       = intval($_POST['id']          ?? 0);
+    $eid      = trim($_POST['eid']           ?? '');
+    $name     = trim($_POST['name']          ?? '');
+    $desig    = trim($_POST['designation']   ?? '');
+    $division = trim($_POST['division']      ?? '');
+    $sub_div  = trim($_POST['sub_division']  ?? '');
+    $role     = trim($_POST['role']          ?? '');
+    $email    = trim($_POST['email']         ?? '');
+    $cell     = trim($_POST['cell_number']   ?? '');
 
-    if ($id <= 0 || $eid === '' || $name === '') {
-        echo json_encode(['success' => false, 'message' => 'ID, EID and Name are required.']);
+    if ($id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid employee ID.']);
         return;
     }
+
+    $err = validateEmployeeInput($eid, $name, $desig, $division, $sub_div, $role, $email, $cell);
+    if ($err) { echo json_encode(['success' => false, 'message' => $err]); return; }
 
     $conn = getConnection();
 
@@ -328,15 +415,15 @@ function editEmployee() {
 
     $stmt = $conn->prepare(
         "UPDATE employees
-         SET eid=?, name=?, designation=?, division=?, sub_division=?, email=?, cell_number=?
+         SET eid=?, name=?, designation=?, division=?, sub_division=?, role=?, email=?, cell_number=?
          WHERE id=?"
     );
-    $stmt->bind_param('sssssssi', $eid, $name, $desig, $division, $sub_div, $email, $cell, $id);
+    $stmt->bind_param('ssssssssi', $eid, $name, $desig, $division, $sub_div, $role, $email, $cell, $id);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => 'Employee updated successfully.']);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to update employee.']);
+        echo json_encode(['success' => false, 'message' => 'Failed to update employee. Please try again.']);
     }
     $stmt->close();
     $conn->close();

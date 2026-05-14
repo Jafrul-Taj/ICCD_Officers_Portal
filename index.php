@@ -2,14 +2,14 @@
 session_start();
 $isOperator      = !empty($_SESSION['operator_id']);
 $operatorUsername = htmlspecialchars($_SESSION['operator_username'] ?? '', ENT_QUOTES);
-$opCols           = $isOperator ? 10 : 9;
+$opCols           = $isOperator ? 11 : 10;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICCD Officer's Portal</title>
+    <title>Employee Archive</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -62,7 +62,6 @@ $opCols           = $isOperator ? 10 : 9;
             flex-shrink: 0;
         }
         .brand-title   { font-size: 1.3rem; font-weight: 700; margin: 0; letter-spacing: .3px; }
-        .brand-sub     { font-size: .75rem; margin: 0; opacity: .75; }
         .header-right  { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .op-badge {
             background: rgba(255,255,255,.12);
@@ -134,6 +133,14 @@ $opCols           = $isOperator ? 10 : 9;
         .form-control:focus, .form-select:focus {
             border-color: var(--primary-light);
             box-shadow: 0 0 0 3px rgba(37,99,168,.13);
+        }
+        .form-control.is-invalid, .form-select.is-invalid {
+            border-color: #dc3545;
+        }
+        .form-select:disabled {
+            background-color: #f8f9fa;
+            color: #adb5bd;
+            cursor: not-allowed;
         }
         .form-check-input:checked {
             background-color: var(--primary);
@@ -212,6 +219,18 @@ $opCols           = $isOperator ? 10 : 9;
         .pill-active   { background: #d1fae5; color: #065f46; }
         .pill-inactive { background: #fee2e2; color: #991b1b; }
 
+        /* Role badge */
+        .role-pill {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: .7rem;
+            font-weight: 600;
+            white-space: nowrap;
+            background: #ede9fe;
+            color: #5b21b6;
+        }
+
         /* Action buttons */
         .btn-act {
             padding: 3px 9px;
@@ -233,7 +252,6 @@ $opCols           = $isOperator ? 10 : 9;
         .modal-title { font-weight: 700; font-size: .95rem; }
         .modal-content { border: none; border-radius: 14px; overflow: hidden; }
 
-        /* Confirm modal uses warning styling */
         .modal-header-warn {
             background: linear-gradient(90deg, #854d0e, #ca8a04);
             color: white;
@@ -287,24 +305,12 @@ $opCols           = $isOperator ? 10 : 9;
         }
         .btn-add:hover { background: #d4a832; border-color: #d4a832; color: #1a1a1a; }
 
-        /* Viewer watermark strip */
-        .viewer-strip {
-            background: linear-gradient(90deg, #eff6ff, #dbeafe);
-            border: 1px solid #bfdbfe;
-            color: #1e40af;
-            border-radius: 10px;
-            padding: 9px 16px;
-            font-size: .82rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 18px;
-        }
+        /* Required field marker */
+        .req { color: #dc3545; margin-left: 2px; }
 
         @media (max-width: 768px) {
             .header-inner  { padding: 10px 14px; }
             .brand-title   { font-size: 1rem; }
-            .brand-sub     { display: none; }
             .page-wrap     { padding: 12px 10px; }
             .table-responsive { overflow-x: auto; }
         }
@@ -330,7 +336,6 @@ $opCols           = $isOperator ? 10 : 9;
             <div class="brand-icon"><i class="bi bi-people-fill"></i></div>
             <div>
                 <p class="brand-title">ICCD Officer's Portal</p>
-                <!-- <p class="brand-sub">ICCD Officer's Portal</p> -->
             </div>
         </div>
         <div class="header-right">
@@ -354,37 +359,42 @@ $opCols           = $isOperator ? 10 : 9;
 <!-- ══════════════ PAGE CONTENT ══════════════ -->
 <div class="page-wrap">
 
-    <?php if (!$isOperator): ?>
-    <!-- <div class="viewer-strip">
-        <i class="bi bi-eye-fill"></i>
-        <span>You are in <strong>read-only viewer mode</strong>. Login as operator to add, edit, or manage employees.</span>
-    </div> -->
-    <?php endif; ?>
-
-    <!-- Filters -->
+    <!-- ── Filters ── -->
     <div class="filter-card">
         <div class="section-title"><i class="bi bi-funnel-fill"></i> Filter Employees</div>
         <div class="row g-3 align-items-end">
+
             <div class="col-6 col-md-3 col-lg-2">
                 <div class="filter-label">Division</div>
                 <select class="form-select" id="divisionFilter">
                     <option value="">All Divisions</option>
                 </select>
             </div>
+
             <div class="col-6 col-md-3 col-lg-2">
                 <div class="filter-label">Sub Division</div>
                 <select class="form-select" id="subdivisionFilter">
                     <option value="">All Sub Divisions</option>
                 </select>
             </div>
+
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="filter-label">Role</div>
+                <select class="form-select" id="roleFilter">
+                    <option value="">All Roles</option>
+                </select>
+            </div>
+
             <div class="col-6 col-md-3 col-lg-2">
                 <div class="filter-label">Name</div>
                 <input type="text" class="form-control" id="nameFilter" placeholder="Search name…">
             </div>
+
             <div class="col-6 col-md-3 col-lg-2">
                 <div class="filter-label">EID</div>
                 <input type="text" class="form-control" id="eidFilter" placeholder="Search EID…">
             </div>
+
             <?php if ($isOperator): ?>
             <div class="col-6 col-md-3 col-lg-2 d-flex align-items-center" style="padding-top:20px;">
                 <div class="form-check mb-0">
@@ -395,15 +405,18 @@ $opCols           = $isOperator ? 10 : 9;
                 </div>
             </div>
             <?php endif; ?>
+
             <div class="col-6 col-md-3 col-lg-2" style="padding-top:20px;">
-                <button class="btn btn-outline-secondary w-100" id="resetFilters" style="height:38px;font-size:.83rem;border-radius:8px;">
+                <button class="btn btn-outline-secondary w-100" id="resetFilters"
+                        style="height:38px;font-size:.83rem;border-radius:8px;">
                     <i class="bi bi-arrow-counterclockwise"></i> Reset
                 </button>
             </div>
+
         </div>
     </div>
 
-    <!-- Employee Table -->
+    <!-- ── Employee Table ── -->
     <div class="table-card">
         <div class="table-head-bar">
             <h5><i class="bi bi-table"></i> Officer's Directory</h5>
@@ -426,6 +439,7 @@ $opCols           = $isOperator ? 10 : 9;
                         <th>Designation</th>
                         <th>Division</th>
                         <th>Sub Division</th>
+                        <th>Role</th>
                         <th>Email</th>
                         <th>Cell Number</th>
                         <th>Status</th>
@@ -484,7 +498,8 @@ $opCols           = $isOperator ? 10 : 9;
     </div>
 </div>
 
-<!-- ══════════════ EMPLOYEE ADD/EDIT MODAL ══════════════ -->
+
+<!-- ══════════════ EMPLOYEE ADD / EDIT MODAL ══════════════ -->
 <div class="modal fade" id="empModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -495,53 +510,87 @@ $opCols           = $isOperator ? 10 : 9;
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <form id="empForm" novalidate>
+                <form id="empForm" novalidate autocomplete="off">
                     <input type="hidden" id="empId">
                     <div class="row g-3">
+
+                        <!-- Row 1: EID + Full Name -->
                         <div class="col-md-6">
                             <label class="form-label fw-semibold" style="font-size:.85rem;">
-                                EID <span class="text-danger">*</span>
+                                EID <span class="req">*</span>
                             </label>
                             <input type="text" class="form-control" id="fEid"
-                                   placeholder="EID" maxlength="20" required>
-                            <div class="invalid-feedback">EID is required.</div>
+                                   placeholder="e.g. 3201" maxlength="20">
+                            <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold" style="font-size:.85rem;">
-                                Full Name <span class="text-danger">*</span>
+                                Full Name <span class="req">*</span>
                             </label>
                             <input type="text" class="form-control" id="fName"
-                                   placeholder="Employee full name" maxlength="100" required>
-                            <div class="invalid-feedback">Name is required.</div>
+                                   placeholder="Employee full name" maxlength="100">
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <!-- Row 2: Designation + Role -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Designation <span class="req">*</span>
+                            </label>
+                            <select class="form-select" id="fDesig">
+                                <option value="">Select Designation</option>
+                            </select>
+                            <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Designation</label>
-                            <input type="text" class="form-control" id="fDesig"
-                                   placeholder="Employee designation" maxlength="100">
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Role <span class="req">*</span>
+                            </label>
+                            <select class="form-select" id="fRole">
+                                <option value="">Select Role</option>
+                            </select>
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <!-- Row 3: Division + Sub Division -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Division <span class="req">*</span>
+                            </label>
+                            <select class="form-select" id="fDiv">
+                                <option value="">Select Division</option>
+                            </select>
+                            <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Division</label>
-                            <input type="text" class="form-control" id="fDiv"
-                                   placeholder="Division" maxlength="100" list="dlDivisions" autocomplete="off">
-                            <datalist id="dlDivisions"></datalist>
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Sub Division <span class="req">*</span>
+                            </label>
+                            <select class="form-select" id="fSubDiv" disabled>
+                                <option value="">Select Division first</option>
+                            </select>
+                            <div class="invalid-feedback"></div>
                         </div>
+
+                        <!-- Row 4: Email + Cell Number -->
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Sub Division</label>
-                            <input type="text" class="form-control" id="fSubDiv"
-                                   placeholder="Sub Division" maxlength="100" list="dlSubDivisions" autocomplete="off">
-                            <datalist id="dlSubDivisions"></datalist>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Email</label>
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Email <span class="req">*</span>
+                            </label>
                             <input type="email" class="form-control" id="fEmail"
-                                   placeholder="employee@ucb.com.bd" maxlength="100">
+                                   placeholder="name@domain.com" maxlength="100">
+                            <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Cell Number</label>
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">
+                                Cell Number <span class="req">*</span>
+                            </label>
                             <input type="text" class="form-control" id="fCell"
-                                   placeholder="e.g. 01711230000" maxlength="20">
+                                   placeholder="01XXXXXXXXX (10–15 digits)" maxlength="15">
+                            <div class="invalid-feedback"></div>
                         </div>
-                    </div>
+
+                    </div><!-- /row -->
                     <div id="empFormErr" class="alert alert-danger py-2 mt-3"
                          style="display:none;font-size:.83rem;"></div>
                 </form>
@@ -557,6 +606,7 @@ $opCols           = $isOperator ? 10 : 9;
         </div>
     </div>
 </div>
+
 
 <!-- ══════════════ CONFIRM MODAL ══════════════ -->
 <div class="modal fade" id="confirmModal" tabindex="-1">
@@ -593,11 +643,14 @@ $opCols           = $isOperator ? 10 : 9;
 const IS_OPERATOR = <?= $isOperator ? 'true' : 'false' ?>;
 const OP_COLS     = <?= $opCols ?>;
 
-let subdivisionsMap  = {};   // { divisionName: [sub1, sub2, …] }
-let allSubdivisions  = [];   // flat list for form datalist (unfiltered)
-let editingId        = null; // null = add mode, number = edit mode
+let subdivisionsMap  = {};
+let allSubdivisions  = [];
+let allDivisions     = [];
+let allDesignations  = [];
+let allRoles         = [];
+let editingId        = null;
 let filterTimer      = null;
-let pendingAction    = null; // { id, newStatus }
+let pendingAction    = null;
 
 let loginModal, empModal, confirmModal;
 
@@ -610,64 +663,35 @@ $(function () {
     loadFilterData();
     loadEmployees();
 
-    /* Filter events */
-    $('#divisionFilter').on('change', function () {
-        const selectedDivision = $(this).val();
-        const $subDiv = $('#subdivisionFilter');
-        
-        // Reset Sub Division dropdown
-        $subDiv.html('<option value="">Select Sub Division</option>');
-        
-        if (selectedDivision === '') {
-            scheduleFilter();
-            return;
-        }
-        
-        // Fetch sub_divisions for selected division
-        $.get('api.php', {
-            action: 'get_subdivisions',
-            division: selectedDivision
-        }, function (data) {
-            if (data.success && data.subdivisions) {
-                data.subdivisions.forEach(subDiv => {
-                    $subDiv.append(new Option(subDiv, subDiv));
-                });
-            }
-            scheduleFilter();
-        }, 'json');
-    });
-    $('#subdivisionFilter').on('change', scheduleFilter);
+    /* ── Filter events ── */
+    $('#divisionFilter').on('change', onFilterDivisionChange);
+    $('#subdivisionFilter').on('change', onFilterSubdivChange);
+    $('#roleFilter').on('change', scheduleFilter);
     $('#nameFilter, #eidFilter').on('input', scheduleFilter);
     <?php if ($isOperator): ?>
     $('#showInactive').on('change', loadEmployees);
     <?php endif; ?>
     $('#resetFilters').on('click', resetFilters);
 
-    /* Login */
+    /* ── Login ── */
     $('#loginForm').on('submit', function (e) { e.preventDefault(); doLogin(); });
     $('#togglePwd').on('click', function () {
         const el   = document.getElementById('loginPassword');
         const icon = document.getElementById('togglePwdIcon');
-        if (el.type === 'password') {
-            el.type = 'text';
-            icon.className = 'bi bi-eye-slash';
-        } else {
-            el.type = 'password';
-            icon.className = 'bi bi-eye';
-        }
+        el.type = (el.type === 'password') ? 'text' : 'password';
+        icon.className = (el.type === 'text') ? 'bi bi-eye-slash' : 'bi bi-eye';
     });
     $('#loginModal').on('hidden.bs.modal', function () {
         $('#loginErr').hide();
         $('#loginForm')[0].reset();
     });
 
-    /* Operator controls */
+    /* ── Operator controls ── */
     <?php if ($isOperator): ?>
     $('#logoutBtn').on('click', doLogout);
     $('#addEmployeeBtn').on('click', openAddModal);
     $('#saveEmpBtn').on('click', saveEmployee);
 
-    /* Table event delegation */
     $('#empTbody').on('click', '.btn-edit', function () {
         openEditModal($(this).data('id'));
     });
@@ -675,7 +699,6 @@ $(function () {
         confirmToggle($(this).data('id'), $(this).data('status'), $(this).data('name'));
     });
 
-    /* Confirm dialog */
     $('#confirmOkBtn').on('click', function () {
         if (pendingAction) {
             doToggleStatus(pendingAction.id, pendingAction.newStatus);
@@ -684,14 +707,25 @@ $(function () {
         }
     });
 
-    /* Session heartbeat */
     setInterval(sessionCheck, 300000);
     <?php endif; ?>
 
-    /* Update form subdivision datalist when division is typed */
-    $('#fDiv').on('input', function () {
-        updateFormSubdivDatalist($(this).val().trim());
+    /* ── Form division change → update sub_division select ── */
+    $('#fDiv').on('change', onFormDivisionChange);
+
+    /* ── Reset modal on close ── */
+    $('#empModal').on('hidden.bs.modal', function () {
+        clearFormErrors();
+        $('#empForm')[0].reset();
+        $('#fSubDiv')
+            .find('option:not(:first)').remove().end()
+            .find('option:first').text('Select Division first').end()
+            .prop('disabled', true).val('');
     });
+
+    /* ── Real-time per-field validation ── */
+    $('#fEid, #fName, #fEmail, #fCell').on('input', function () { clearFieldError(this); });
+    $('#fDesig, #fDiv, #fSubDiv, #fRole').on('change', function () { clearFieldError(this); });
 });
 
 /* ══════════════ FILTER DATA ══════════════ */
@@ -701,21 +735,80 @@ function loadFilterData() {
 
         subdivisionsMap = res.subdivisions      || {};
         allSubdivisions = res.all_subdivisions  || [];
+        allDivisions    = res.divisions         || [];
+        allDesignations = res.designations      || [];
+        allRoles        = res.roles             || [];
 
-        /* Division dropdown */
-        const $div = $('#divisionFilter');
-        $div.find('option:not(:first)').remove();
-        (res.divisions || []).forEach(d => $div.append(new Option(d, d)));
+        /* Filter: division */
+        const $df = $('#divisionFilter');
+        $df.find('option:not(:first)').remove();
+        allDivisions.forEach(d => $df.append(new Option(d, d)));
 
-        /* Reset subdivision dropdown to "all" state */
-        updateSubdivDropdown('');
+        /* Filter: role */
+        const $rf = $('#roleFilter');
+        $rf.find('option:not(:first)').remove();
+        allRoles.forEach(r => $rf.append(new Option(r, r)));
 
-        /* Datalists for employee form */
-        populateFormDatalist('');
+        /* Filter: sub_division (all) */
+        refreshFilterSubdivOptions('');
     }, 'json');
 }
 
-function updateSubdivDropdown(division) {
+function onFilterDivisionChange() {
+    const div  = $(this).val();
+    const $sub = $('#subdivisionFilter');
+    $sub.find('option:not(:first)').remove().end().val('');
+
+    if (div === '') {
+        /* Restore all sub-divisions and all roles */
+        refreshFilterSubdivOptions('');
+        updateRoleFilter('', '');
+        scheduleFilter();
+        return;
+    }
+
+    $.get('api.php', { action: 'get_subdivisions', division: div }, function (data) {
+        if (data.success) {
+            data.subdivisions.forEach(s => $sub.append(new Option(s, s)));
+        }
+        /* Show only roles that exist in this division */
+        updateRoleFilter(div, '');
+        scheduleFilter();
+    }, 'json');
+}
+
+function onFilterSubdivChange() {
+    const div = $('#divisionFilter').val();
+    const sub = $(this).val();
+    /* Narrow or widen roles based on current division + sub_division */
+    updateRoleFilter(div, sub);
+    scheduleFilter();
+}
+
+function updateRoleFilter(division, subDiv) {
+    const prevRole = $('#roleFilter').val();
+
+    $.get('api.php', {
+        action:       'get_roles',
+        division:     division || '',
+        sub_division: subDiv   || ''
+    }, function (res) {
+        if (!res.success) return;
+
+        const $rf = $('#roleFilter');
+        $rf.find('option:not(:first)').remove();
+        res.roles.forEach(r => $rf.append(new Option(r, r)));
+
+        /* Restore previous selection only if it still appears in the narrowed list */
+        const stillValid = res.roles.includes(prevRole);
+        $rf.val(stillValid ? prevRole : '');
+
+        /* If the previously-selected role was removed, re-run the employee query */
+        if (prevRole && !stillValid) scheduleFilter();
+    }, 'json');
+}
+
+function refreshFilterSubdivOptions(division) {
     const $sel = $('#subdivisionFilter');
     $sel.find('option:not(:first)').remove();
     const list = (division && subdivisionsMap[division])
@@ -724,22 +817,60 @@ function updateSubdivDropdown(division) {
     list.forEach(s => $sel.append(new Option(s, s)));
 }
 
-function populateFormDatalist(division) {
-    /* Division datalist */
-    const $dl = $('#dlDivisions');
-    $dl.empty();
-    Object.keys(subdivisionsMap).forEach(d => $dl.append($('<option>').val(d)));
+/* ══════════════ FORM DROPDOWNS ══════════════ */
+function populateFormDropdowns() {
+    /* Designation */
+    const $d = $('#fDesig');
+    $d.find('option:not(:first)').remove();
+    allDesignations.forEach(d => $d.append(new Option(d, d)));
 
-    updateFormSubdivDatalist(division);
+    /* Division */
+    const $div = $('#fDiv');
+    $div.find('option:not(:first)').remove();
+    allDivisions.forEach(d => $div.append(new Option(d, d)));
+
+    /* Sub Division – reset & disable until division selected */
+    $('#fSubDiv')
+        .find('option:not(:first)').remove().end()
+        .find('option:first').text('Select Division first').end()
+        .prop('disabled', true).val('');
+
+    /* Role */
+    const $r = $('#fRole');
+    $r.find('option:not(:first)').remove();
+    allRoles.forEach(r => $r.append(new Option(r, r)));
 }
 
-function updateFormSubdivDatalist(division) {
-    const $dl = $('#dlSubDivisions');
-    $dl.empty();
-    const list = (division && subdivisionsMap[division])
-        ? subdivisionsMap[division]
-        : allSubdivisions;
-    list.forEach(s => $dl.append($('<option>').val(s)));
+function onFormDivisionChange() {
+    const div  = $(this).val();
+    const $sub = $('#fSubDiv');
+
+    $sub.find('option:not(:first)').remove();
+    $sub.val('').prop('disabled', true);
+    clearFieldError($sub[0]);
+
+    if (!div) {
+        $sub.find('option:first').text('Select Division first');
+        return;
+    }
+
+    $sub.find('option:first').text('Select Sub Division');
+    const subs = subdivisionsMap[div] || [];
+    if (subs.length > 0) {
+        subs.forEach(s => $sub.append(new Option(s, s)));
+        $sub.prop('disabled', false);
+    }
+    /* If the division has no recorded sub_divisions, sub stays disabled */
+}
+
+function setSelectValue(selector, value) {
+    const $sel = $(selector);
+    if (value) {
+        const alreadyPresent = $sel.find('option').toArray()
+            .some(o => o.value === value);
+        if (!alreadyPresent) $sel.append(new Option(value, value));
+    }
+    $sel.val(value || '');
 }
 
 /* ══════════════ LOAD EMPLOYEES ══════════════ */
@@ -748,6 +879,7 @@ function loadEmployees() {
         action:        'get_employees',
         division:      $('#divisionFilter').val(),
         sub_division:  $('#subdivisionFilter').val(),
+        role:          $('#roleFilter').val(),
         name:          $('#nameFilter').val(),
         eid:           $('#eidFilter').val(),
         show_inactive: ($('#showInactive').length && $('#showInactive').is(':checked')) ? '1' : '0'
@@ -773,13 +905,13 @@ function scheduleFilter() {
 
 function resetFilters() {
     $('#divisionFilter').val('');
-    updateSubdivDropdown('');
     $('#subdivisionFilter').val('');
+    refreshFilterSubdivOptions('');
     $('#nameFilter').val('');
     $('#eidFilter').val('');
-    if ($('#showInactive').length) {
-        $('#showInactive').prop('checked', false);
-    }
+    if ($('#showInactive').length) $('#showInactive').prop('checked', false);
+    /* Restore full role list, then reload employees */
+    updateRoleFilter('', '');
     loadEmployees();
 }
 
@@ -814,6 +946,11 @@ function renderTable(employees) {
         $tr.append($('<td>').text(emp.designation || ''));
         $tr.append($('<td>').text(emp.division || ''));
         $tr.append($('<td>').text(emp.sub_division || ''));
+        $tr.append($('<td>').append(
+            emp.role
+                ? $('<span>').addClass('role-pill').text(emp.role)
+                : $('<span>').text('')
+        ));
         $tr.append($('<td>').text(emp.email || ''));
         $tr.append($('<td>').text(emp.cell_number || ''));
 
@@ -830,27 +967,27 @@ function renderTable(employees) {
 
         if (IS_OPERATOR) {
             const $tdAct = $('<td>');
-
-            const $editBtn = $('<button>')
-                .addClass('btn btn-sm btn-outline-primary btn-act btn-edit me-1')
-                .attr('data-id', emp.id)
-                .html('<i class="bi bi-pencil-fill"></i> Edit');
-            $tdAct.append($editBtn);
-
+            $tdAct.append(
+                $('<button>')
+                    .addClass('btn btn-sm btn-outline-primary btn-act btn-edit me-1')
+                    .attr('data-id', emp.id)
+                    .html('<i class="bi bi-pencil-fill"></i> Edit')
+            );
             if (inactive) {
-                const $reactBtn = $('<button>')
-                    .addClass('btn btn-sm btn-outline-success btn-act btn-toggle')
-                    .attr({ 'data-id': emp.id, 'data-status': 'active', 'data-name': emp.name })
-                    .html('<i class="bi bi-arrow-up-circle-fill"></i> Reactivate');
-                $tdAct.append($reactBtn);
+                $tdAct.append(
+                    $('<button>')
+                        .addClass('btn btn-sm btn-outline-success btn-act btn-toggle')
+                        .attr({ 'data-id': emp.id, 'data-status': 'active', 'data-name': emp.name })
+                        .html('<i class="bi bi-arrow-up-circle-fill"></i> Reactivate')
+                );
             } else {
-                const $inactBtn = $('<button>')
-                    .addClass('btn btn-sm btn-outline-danger btn-act btn-toggle')
-                    .attr({ 'data-id': emp.id, 'data-status': 'inactive', 'data-name': emp.name })
-                    .html('<i class="bi bi-slash-circle-fill"></i> Inactivate');
-                $tdAct.append($inactBtn);
+                $tdAct.append(
+                    $('<button>')
+                        .addClass('btn btn-sm btn-outline-danger btn-act btn-toggle')
+                        .attr({ 'data-id': emp.id, 'data-status': 'inactive', 'data-name': emp.name })
+                        .html('<i class="bi bi-slash-circle-fill"></i> Inactivate')
+                );
             }
-
             $tr.append($tdAct);
         }
 
@@ -861,63 +998,110 @@ function renderTable(employees) {
 /* ══════════════ ADD / EDIT ══════════════ */
 function openAddModal() {
     editingId = null;
+    clearFormErrors();
     $('#empModalTitle').html('<i class="bi bi-person-plus-fill me-2"></i>Add Employee');
     $('#empForm')[0].reset();
     $('#empId').val('');
-    $('#empFormErr').hide();
-    $('#empForm').removeClass('was-validated');
-    populateFormDatalist('');
+    populateFormDropdowns();
     empModal.show();
 }
 
 function openEditModal(id) {
     editingId = id;
-    $('#empFormErr').hide();
-    $('#empForm').removeClass('was-validated');
+    clearFormErrors();
     $('#empModalTitle').html('<i class="bi bi-pencil-square me-2"></i>Edit Employee');
+    populateFormDropdowns();
 
     showSpinner();
     $.get('api.php', { action: 'get_employee', id: id })
         .done(function (res) {
             hideSpinner();
-            if (res.success && res.data) {
-                const e = res.data;
-                $('#empId').val(e.id);
-                $('#fEid').val(e.eid    || '');
-                $('#fName').val(e.name  || '');
-                $('#fDesig').val(e.designation  || '');
-                $('#fDiv').val(e.division       || '');
-                $('#fSubDiv').val(e.sub_division || '');
-                $('#fEmail').val(e.email         || '');
-                $('#fCell').val(e.cell_number    || '');
-                populateFormDatalist(e.division || '');
-                empModal.show();
-            } else {
+            if (!res.success || !res.data) {
                 showToast('Failed to load employee data.', 'danger');
+                return;
             }
+            const e = res.data;
+
+            $('#empId').val(e.id);
+            $('#fEid').val(e.eid    || '');
+            $('#fName').val(e.name  || '');
+            $('#fEmail').val(e.email || '');
+            $('#fCell').val(e.cell_number || '');
+
+            setSelectValue('#fDesig', e.designation);
+
+            /* Division first, then sub_division */
+            setSelectValue('#fDiv', e.division);
+            const $sub = $('#fSubDiv');
+            $sub.find('option:not(:first)').remove();
+            $sub.find('option:first').text('Select Sub Division');
+            if (e.division) {
+                const subs = subdivisionsMap[e.division] || [];
+                subs.forEach(s => $sub.append(new Option(s, s)));
+                /* If employee's sub_division is not in the mapped list, add it */
+                if (e.sub_division && !subs.includes(e.sub_division)) {
+                    $sub.append(new Option(e.sub_division, e.sub_division));
+                }
+                $sub.prop('disabled', false);
+            }
+            $sub.val(e.sub_division || '');
+
+            setSelectValue('#fRole', e.role);
+
+            empModal.show();
         })
         .fail(handleAjaxFail);
 }
 
+/* ══════════════ SAVE EMPLOYEE ══════════════ */
 function saveEmployee() {
-    const eid  = $('#fEid').val().trim();
-    const name = $('#fName').val().trim();
+    clearFormErrors();
 
-    if (!eid || !name) {
-        $('#empForm').addClass('was-validated');
-        return;
+    const eid   = $('#fEid').val().trim();
+    const name  = $('#fName').val().trim();
+    const desig = $('#fDesig').val();
+    const div   = $('#fDiv').val();
+    const subDisabled = $('#fSubDiv').prop('disabled');
+    const sub   = subDisabled ? '' : ($('#fSubDiv').val() || '');
+    const role  = $('#fRole').val();
+    const email = $('#fEmail').val().trim();
+    const cell  = $('#fCell').val().trim();
+
+    let valid = true;
+    const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!eid)   { setFieldError('#fEid',   'EID is required.');            valid = false; }
+    if (!name)  { setFieldError('#fName',  'Full Name is required.');      valid = false; }
+    if (!desig) { setFieldError('#fDesig', 'Please select a Designation.'); valid = false; }
+    if (!div)   { setFieldError('#fDiv',   'Please select a Division.');    valid = false; }
+    if (!subDisabled && !sub) {
+        setFieldError('#fSubDiv', 'Please select a Sub Division.');         valid = false;
     }
+    if (!role)  { setFieldError('#fRole',  'Please select a Role.');       valid = false; }
+    if (!email) {
+        setFieldError('#fEmail', 'Email is required.');                     valid = false;
+    } else if (!emailRx.test(email)) {
+        setFieldError('#fEmail', 'Enter a valid email (e.g. name@domain.com).'); valid = false;
+    }
+    if (!cell) {
+        setFieldError('#fCell', 'Cell Number is required.');                valid = false;
+    } else if (!/^\d{10,15}$/.test(cell)) {
+        setFieldError('#fCell', 'Must be 10–15 digits, numbers only.');     valid = false;
+    }
+
+    if (!valid) return;
 
     const data = {
         action:       editingId ? 'edit_employee' : 'add_employee',
         id:           editingId || '',
         eid,
         name,
-        designation:  $('#fDesig').val().trim(),
-        division:     $('#fDiv').val().trim(),
-        sub_division: $('#fSubDiv').val().trim(),
-        email:        $('#fEmail').val().trim(),
-        cell_number:  $('#fCell').val().trim()
+        designation:  desig,
+        division:     div,
+        sub_division: sub,
+        role,
+        email,
+        cell_number:  cell
     };
 
     showSpinner();
@@ -948,8 +1132,8 @@ function saveEmployee() {
 /* ══════════════ TOGGLE STATUS ══════════════ */
 function confirmToggle(id, newStatus, empName) {
     pendingAction = { id, newStatus };
-    const verb    = newStatus === 'active' ? 'reactivate' : 'inactivate';
-    const safe    = $('<span>').text(empName).html();
+    const verb = newStatus === 'active' ? 'reactivate' : 'inactivate';
+    const safe = $('<span>').text(empName).html();
     $('#confirmMsg').html(
         'Are you sure you want to <strong>' + verb + '</strong> employee<br><strong>' + safe + '</strong>?'
     );
@@ -994,7 +1178,8 @@ function doLogin() {
 
     $.post('api.php', { action: 'login', username, password })
         .done(function (res) {
-            $('#loginBtn').prop('disabled', false).html('<i class="bi bi-box-arrow-in-right me-1"></i>Login');
+            $('#loginBtn').prop('disabled', false)
+                .html('<i class="bi bi-box-arrow-in-right me-1"></i>Login');
             if (res.success) {
                 loginModal.hide();
                 showToast('Welcome, ' + res.username + '! Reloading…', 'success');
@@ -1005,19 +1190,19 @@ function doLogin() {
             }
         })
         .fail(function () {
-            $('#loginBtn').prop('disabled', false).html('<i class="bi bi-box-arrow-in-right me-1"></i>Login');
+            $('#loginBtn').prop('disabled', false)
+                .html('<i class="bi bi-box-arrow-in-right me-1"></i>Login');
             $('#loginErr').text('Server error. Please try again.').show();
         });
 }
 
 function doLogout() {
     showSpinner();
-    $.post('api.php', { action: 'logout' })
-        .always(function () {
-            hideSpinner();
-            showToast('Logged out. Returning to viewer mode…', 'info');
-            setTimeout(() => location.reload(), 700);
-        });
+    $.post('api.php', { action: 'logout' }).always(function () {
+        hideSpinner();
+        showToast('Logged out. Returning to viewer mode…', 'info');
+        setTimeout(() => location.reload(), 700);
+    });
 }
 
 function sessionCheck() {
@@ -1031,7 +1216,25 @@ function onSessionExpired() {
     setTimeout(() => location.reload(), 2200);
 }
 
-/* ══════════════ HELPERS ══════════════ */
+/* ══════════════ FORM VALIDATION HELPERS ══════════════ */
+function setFieldError(selector, msg) {
+    const $el = $(selector);
+    $el.addClass('is-invalid');
+    $el.siblings('.invalid-feedback').first().text(msg);
+}
+
+function clearFieldError(el) {
+    $(el).removeClass('is-invalid')
+        .siblings('.invalid-feedback').first().text('');
+}
+
+function clearFormErrors() {
+    $('#empForm .is-invalid').removeClass('is-invalid');
+    $('#empForm .invalid-feedback').text('');
+    $('#empFormErr').hide();
+}
+
+/* ══════════════ GENERAL HELPERS ══════════════ */
 function handleAjaxFail(xhr) {
     hideSpinner();
     if (xhr.status === 401) onSessionExpired();
@@ -1054,7 +1257,8 @@ function showToast(message, type) {
 
     const $t = $(`
         <div id="${toastId}" class="toast align-items-center text-bg-${type} border-0 mb-2"
-             role="alert" aria-atomic="true" style="min-width:280px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.2);">
+             role="alert" aria-atomic="true"
+             style="min-width:280px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.2);">
             <div class="d-flex">
                 <div class="toast-body d-flex align-items-center gap-2" style="font-size:.875rem;">
                     <i class="bi ${icon} flex-shrink-0"></i>
